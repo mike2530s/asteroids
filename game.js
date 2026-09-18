@@ -70,24 +70,42 @@ class Asteroid {
     this.radius = RADII[size];
     this.dead = false;
 
-    const angle = rand(0, Math.PI * 2);
-    const speed = SPEEDS[size] + rand(-15, 15);
-    this.vx = Math.cos(angle) * speed;
-    this.vy = Math.sin(angle) * speed;
+    // 15% de probabilidad de ser Estrella Fugaz (ajusta por nivel si quieres)
+    const isSS = Math.random() < 0.15;
+    this.isShootingStar = isSS;
+    if (isSS) {
+      this.shootingStarTTL = rand(4, 6);    // vida en segundos
+      this.shootingStarSpeedMult = rand(25, 30) / 10; // 2.5x a 3x
+      const angle = rand(0, Math.PI * 2);
+      const baseSpeed = SPEEDS[size] + rand(-15, 15);
+      const speed = baseSpeed * this.shootingStarSpeedMult;
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+    } else {
+      const angle = rand(0, Math.PI * 2);
+      const speed = SPEEDS[size] + rand(-15, 15);
+      this.vx = Math.cos(angle) * speed;
+      this.vy = Math.sin(angle) * speed;
+    }
     this.rotSpeed = rand(-1.2, 1.2);
     this.rot = rand(0, Math.PI * 2);
 
-    // Polígono irregular
-    const n = randInt(8, 13);
+    // Polígono irregular (estrella fugaz: forma puntiaguda/estirada)
+    const n = randInt(isSS ? 6 : 8, isSS ? 8 : 13);
     this.verts = [];
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2;
-      const r = this.radius * rand(0.6, 1.0);
+      const r = this.radius * rand(0.5, isSS ? 0.8 : 1.0);
       this.verts.push([Math.cos(a) * r, Math.sin(a) * r]);
     }
   }
 
   update(dt) {
+    // Si es estrella fugaz, decrementar TTL y auto-destruirse al expirar
+    if (this.isShootingStar) {
+      this.shootingStarTTL -= dt;
+      if (this.shootingStarTTL <= 0) this.dead = true;
+    }
     this.x   = wrap(this.x + this.vx * dt, W);
     this.y   = wrap(this.y + this.vy * dt, H);
     this.rot += this.rotSpeed * dt;
@@ -105,15 +123,41 @@ class Asteroid {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rot);
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth   = 1.5;
+    
+    // Diferenciador visual: Estrella Fugaz = color dorado, lineWidth 2, forma puntiaguda
+    if (this.isShootingStar) {
+      ctx.strokeStyle = '#ffd700';   // dorado brillante
+      ctx.lineWidth   = 2;
+    } else {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth   = 1.5;
+    }
     ctx.lineJoin    = 'round';
+    
     ctx.beginPath();
     ctx.moveTo(this.verts[0][0], this.verts[0][1]);
     for (let i = 1; i < this.verts.length; i++)
       ctx.lineTo(this.verts[i][0], this.verts[i][1]);
     ctx.closePath();
     ctx.stroke();
+    
+    // Estela corta: 2-3 puntos atrás siguiendo la dirección
+    if (this.isShootingStar) {
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(255,215,0,0.5)';
+      // Dibujar 2 segmentos atrás en la dirección de movimiento
+      const trailPoints = 2;
+      for (let i = 0; i < trailPoints; i++) {
+        const t = (i + 1) / (trailPoints + 1);
+        const tx = this.x - this.vx * t * 0.1; // scaled for visual
+        const ty = this.y - this.vy * t * 0.1;
+        ctx.beginPath();
+        ctx.moveTo(tx - 3, ty);
+        ctx.lineTo(tx + 3, ty);
+        ctx.stroke();
+      }
+    }
+    
     ctx.restore();
   }
 }
@@ -421,9 +465,15 @@ function update(dt) {
       if (!a.dead && !b.dead && dist(b, a) < a.radius) {
         b.dead = true;
         a.dead = true;
-        score += POINTS[a.size];
-        explode(a.x, a.y, a.size * 5);
-        newAsteroids.push(...a.split());
+        if (a.isShootingStar) {
+          score += 500;                      // bonificación alta
+          explode(a.x, a.y, 12);            // partículas doradas/amarillas
+          // NO dividir: split retorna []
+        } else {
+          score += POINTS[a.size];
+          explode(a.x, a.y, a.size * 5);
+          newAsteroids.push(...a.split()); // asteroides normales se parten
+        }
       }
     }
   }
