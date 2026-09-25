@@ -162,9 +162,25 @@ class Asteroid {
   }
 }
 
+// ── Skins ─────────────────────────────────────────────────────────────────────
+const SKINS = [
+  { name: 'CLASICA', stroke: '#fff',    flame: 'rgba(255,130,0,0.85)' },
+  { name: 'NEON',    stroke: '#0ff',    flame: 'rgba(0,255,255,0.9)' },
+  { name: 'MAGMA',   stroke: '#ff5a2a', flame: 'rgba(255,60,20,0.9)' },
+  { name: 'VENENO',  stroke: '#7CFC00', flame: 'rgba(124,252,0,0.9)' },
+];
+const SKIN_KEY = 'asteroids-skin';
+const loadSkin = () => {
+  try {
+    const i = parseInt(localStorage.getItem(SKIN_KEY), 10);
+    return Number.isInteger(i) && SKINS[i] ? i : 0;
+  } catch { return 0; }
+};
+const saveSkin = i => { try { localStorage.setItem(SKIN_KEY, i); } catch {} };
+
 // ── Ship ──────────────────────────────────────────────────────────────────────
 class Ship {
-  constructor() { this.reset(); }
+  constructor() { this.skin = loadSkin(); this.reset(); }
 
   reset() {
     this.x      = W / 2;
@@ -177,6 +193,8 @@ class Ship {
     this.invincible    = 3;
     this.shootCooldown = 0;
     this.speedBoost    = 0;
+    this.shield        = 0;
+    this.tripleShot    = 0;
     this.dead          = false;
   }
 
@@ -185,6 +203,8 @@ class Ship {
     if (this.invincible    > 0) this.invincible    -= dt;
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
     if (this.speedBoost    > 0) this.speedBoost    -= dt;
+    if (this.shield        > 0) this.shield        -= dt;
+    if (this.tripleShot    > 0) this.tripleShot    -= dt;
 
     const ROT   = 3.5;   // rad/s
     const THRUST = this.speedBoost > 0 ? 520 : 260;  // px/s² (2x con velocidad)
@@ -211,15 +231,30 @@ class Ship {
     const NOSE = 21;
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
-    return [new Bullet(ox, oy, this.angle)];
+    if (this.tripleShot <= 0) return [new Bullet(ox, oy, this.angle)];
+    const px = -Math.sin(this.angle);
+    const py = Math.cos(this.angle);
+    return [-8, 0, 8].map(off => new Bullet(ox + px * off, oy + py * off, this.angle));
   }
 
   draw() {
     if (this.dead) return;
+    if (this.shield > 0) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.strokeStyle = `rgba(77,166,255,${0.6 + Math.sin(Date.now() * 0.01) * 0.25})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius + 10, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     // Parpadeo durante invencibilidad de reaparición
     if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0) return;
 
     const boostActive = this.speedBoost > 0;
+    const tripleActive = this.tripleShot > 0;
+    const skin = SKINS[this.skin] || SKINS[0];
 
     // Halo cyan sutil cuando velocidad activa
     if (boostActive) {
@@ -232,11 +267,21 @@ class Ship {
       ctx.stroke();
       ctx.restore();
     }
+    if (tripleActive) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.strokeStyle = `rgba(255,0,255,${0.35 + Math.sin(Date.now()*0.012)*0.15})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius + 14, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    ctx.strokeStyle = boostActive ? '#0ff' : '#fff';
+    ctx.strokeStyle = boostActive ? '#0ff' : tripleActive ? '#f0f' : skin.stroke;
     ctx.lineWidth   = 1.5;
     ctx.lineJoin    = 'round';
 
@@ -255,7 +300,7 @@ class Ship {
       ctx.moveTo(-8, -4);
       ctx.lineTo(-8 - rand(6, 14), 0);
       ctx.lineTo(-8,  4);
-      ctx.strokeStyle = boostActive ? 'rgba(0,255,255,0.9)' : 'rgba(255, 130, 0, 0.85)';
+      ctx.strokeStyle = boostActive ? 'rgba(0,255,255,0.9)' : skin.flame;
       ctx.stroke();
     }
 
@@ -295,11 +340,12 @@ class Particle {
   }
 }
 
-// ── Power-up velocidad ────────────────────────────────────────────────────────
+// ── Power-ups ─────────────────────────────────────────────────────────────────
 class PowerUp {
-  constructor(x, y) {
+  constructor(x, y, kind = 'speed') {
     this.x = x;
     this.y = y;
+    this.kind = kind;
     this.radius = 14;
     this.ttl = 8;
     this.dead = false;
@@ -315,10 +361,31 @@ class PowerUp {
   draw() {
     const alpha = Math.min(1, this.ttl > 1 ? 1 : this.ttl);
     const scale = 1 + Math.sin(this.pulse) * 0.12;
+    if (this.kind === 'shield') {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.scale(scale, scale);
+      ctx.strokeStyle = `rgba(77,166,255,${alpha.toFixed(2)})`;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(0, 0, 12, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, 7, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(77,166,255,${(0.5 * alpha).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+    const col = this.kind === 'triple' ? '255,0,255' : '0,255,255';
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.scale(scale, scale);
-    ctx.strokeStyle = `rgba(0,255,255,${alpha.toFixed(2)})`;
+    ctx.strokeStyle = `rgba(${col},${alpha.toFixed(2)})`;
     ctx.lineWidth = 1.8;
     ctx.lineJoin = 'round';
     // Diamante exterior
@@ -329,18 +396,26 @@ class PowerUp {
     ctx.lineTo(-10, 0);
     ctx.closePath();
     ctx.stroke();
-    // Rayo interior ">>"
     ctx.lineWidth = 1.4;
     ctx.beginPath();
-    ctx.moveTo(-4, -6);
-    ctx.lineTo(2, 0);
-    ctx.lineTo(-4, 6);
-    ctx.moveTo(1, -6);
-    ctx.lineTo(7, 0);
-    ctx.lineTo(1, 6);
+    if (this.kind === 'triple') {
+      ctx.moveTo(-5, -6);
+      ctx.lineTo(-5, 6);
+      ctx.moveTo(0, -6);
+      ctx.lineTo(0, 6);
+      ctx.moveTo(5, -6);
+      ctx.lineTo(5, 6);
+    } else {
+      ctx.moveTo(-4, -6);
+      ctx.lineTo(2, 0);
+      ctx.lineTo(-4, 6);
+      ctx.moveTo(1, -6);
+      ctx.lineTo(7, 0);
+      ctx.lineTo(1, 6);
+    }
     ctx.stroke();
     // Brillo central
-    ctx.fillStyle = `rgba(0,255,255,${(0.5 * alpha).toFixed(2)})`;
+    ctx.fillStyle = `rgba(${col},${(0.5 * alpha).toFixed(2)})`;
     ctx.beginPath();
     ctx.arc(0, 0, 2, 0, Math.PI * 2);
     ctx.fill();
@@ -354,6 +429,7 @@ let score, lives, level;
 let state;      // 'playing' | 'dead' | 'gameover'
 let deadTimer;
 let powerUpSpawnCooldown;
+let shieldSpawnCooldown;
 
 function spawnAsteroids(count) {
   const SAFE_DIST = 130;
@@ -367,14 +443,14 @@ function spawnAsteroids(count) {
   }
 }
 
-function spawnPowerUp() {
+function spawnPowerUp(kind = 'speed') {
   const SAFE_DIST = 130;
   let x, y;
   do {
     x = rand(0, W);
     y = rand(0, H);
   } while (Math.hypot(x - W / 2, y - H / 2) < SAFE_DIST);
-  powerUps.push(new PowerUp(x, y));
+  powerUps.push(new PowerUp(x, y, kind));
 }
 
 function initGame() {
@@ -388,6 +464,7 @@ function initGame() {
   level  = 1;
   state  = 'playing';
   powerUpSpawnCooldown = rand(12, 18);
+  shieldSpawnCooldown = rand(15, 22);
   spawnAsteroids(4);
 }
 
@@ -398,6 +475,7 @@ function nextLevel() {
   powerUps  = [];
   ship.reset();
   powerUpSpawnCooldown = rand(12, 18);
+  shieldSpawnCooldown = rand(15, 22);
   spawnAsteroids(3 + level);
 }
 
@@ -409,6 +487,8 @@ function killShip() {
   explode(ship.x, ship.y, 14);
   ship.dead = true;
   ship.speedBoost = 0;
+  ship.shield = 0;
+  ship.tripleShot = 0;
   lives--;
   if (lives <= 0) {
     state = 'gameover';
@@ -436,6 +516,14 @@ function update(dt) {
     return;
   }
 
+  // Cambiar skin 1-4
+  for (let i = 0; i < SKINS.length; i++) {
+    if (pressed('Digit' + (i + 1)) || pressed('Numpad' + (i + 1))) {
+      ship.skin = i;
+      saveSkin(i);
+    }
+  }
+
   // Disparar
   if (pressed('Space')) {
     bullets.push(...ship.tryShoot());
@@ -451,11 +539,17 @@ function update(dt) {
   particles = particles.filter(p => !p.dead);
   powerUps  = powerUps.filter(p => !p.dead);
 
-  // Spawn power-up velocidad cada 12-18s
+  // Spawn power-up velocidad/triple cada 12-18s
   powerUpSpawnCooldown -= dt;
-  if (powerUpSpawnCooldown <= 0 && powerUps.length === 0) {
-    spawnPowerUp();
+  if (powerUpSpawnCooldown <= 0 && !powerUps.some(p => (p.kind === 'speed' || p.kind === 'triple') && !p.dead)) {
+    spawnPowerUp(Math.random() < 0.5 ? 'speed' : 'triple');
     powerUpSpawnCooldown = rand(12, 18);
+  }
+  // Spawn escudo cada 15-22s
+  shieldSpawnCooldown -= dt;
+  if (shieldSpawnCooldown <= 0 && !powerUps.some(p => p.kind === 'shield' && !p.dead)) {
+    spawnPowerUp('shield');
+    shieldSpawnCooldown = rand(15, 22);
   }
 
   // Bala vs asteroide
@@ -482,19 +576,39 @@ function update(dt) {
 
   // Nave vs asteroide
   if (ship.invincible <= 0) {
-    for (const a of asteroids) {
-      if (dist(ship, a) < ship.radius + a.radius * 0.82) {
-        killShip();
-        break;
+    if (ship.shield > 0) {
+      const blocked = [];
+      for (const a of asteroids) {
+        if (!a.dead && dist(ship, a) < ship.radius + 10 + a.radius * 0.82) {
+          a.dead = true;
+          if (a.isShootingStar) {
+            score += 500;
+            explode(a.x, a.y, 12);
+          } else {
+            score += POINTS[a.size];
+            explode(a.x, a.y, a.size * 5);
+            blocked.push(...a.split());
+          }
+        }
+      }
+      asteroids = asteroids.filter(a => !a.dead).concat(blocked);
+    } else {
+      for (const a of asteroids) {
+        if (dist(ship, a) < ship.radius + a.radius * 0.82) {
+          killShip();
+          break;
+        }
       }
     }
   }
 
-  // Nave vs power-up velocidad
+  // Nave vs power-ups
   for (const p of powerUps) {
     if (!p.dead && dist(ship, p) < ship.radius + p.radius) {
       p.dead = true;
-      ship.speedBoost = 5;
+      if (p.kind === 'shield') ship.shield = 8;
+      else if (p.kind === 'triple') ship.tripleShot = 5;
+      else ship.speedBoost = 5;
       explode(p.x, p.y, 6);
     }
   }
@@ -505,11 +619,11 @@ function update(dt) {
 }
 
 // ── Draw ──────────────────────────────────────────────────────────────────────
-function drawLifeIcon(x, y) {
+function drawLifeIcon(x, y, color = '#fff') {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(-Math.PI / 2);
-  ctx.strokeStyle = '#fff';
+  ctx.strokeStyle = color;
   ctx.lineWidth   = 1.2;
   ctx.lineJoin    = 'round';
   ctx.beginPath();
@@ -533,24 +647,66 @@ function drawHUD() {
   ctx.fillText(`NIVEL ${level}`, W / 2, 26);
 
   for (let i = 0; i < lives; i++)
-    drawLifeIcon(W - 16 - i * 22, 18);
+    drawLifeIcon(W - 16 - i * 22, 18, (ship ? SKINS[ship.skin] || SKINS[0] : SKINS[0]).stroke);
 
+  const skin = ship ? SKINS[ship.skin] || SKINS[0] : SKINS[0];
+  ctx.textAlign = 'left';
+  ctx.fillStyle = skin.stroke;
+  ctx.font = '12px monospace';
+  ctx.fillText(`SKIN [1-4] ${skin.name}`, 14, H - 14);
+
+  let hudY = 46;
   if (ship && ship.speedBoost > 0) {
     const t = ship.speedBoost;
     ctx.fillStyle = '#0ff';
     ctx.textAlign = 'center';
     ctx.font = '13px monospace';
-    ctx.fillText(`VELOCIDAD ${t.toFixed(1)}s`, W / 2, 46);
+    ctx.fillText(`VELOCIDAD ${t.toFixed(1)}s`, W / 2, hudY);
     // Barra de duración
     const barW = 80;
     const barH = 4;
     const barX = W / 2 - barW / 2;
-    const barY = 52;
+    const barY = hudY + 6;
     ctx.strokeStyle = 'rgba(0,255,255,0.5)';
     ctx.lineWidth = 1;
     ctx.strokeRect(barX, barY, barW, barH);
     ctx.fillStyle = '#0ff';
     ctx.fillRect(barX, barY, barW * (t / 5), barH);
+    hudY += 26;
+  }
+  if (ship && ship.tripleShot > 0) {
+    const t = ship.tripleShot;
+    ctx.fillStyle = '#f0f';
+    ctx.textAlign = 'center';
+    ctx.font = '13px monospace';
+    ctx.fillText(`TRIPLE ${t.toFixed(1)}s`, W / 2, hudY);
+    const barW = 80;
+    const barH = 4;
+    const barX = W / 2 - barW / 2;
+    const barY = hudY + 6;
+    ctx.strokeStyle = 'rgba(255,0,255,0.5)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barW, barH);
+    ctx.fillStyle = '#f0f';
+    ctx.fillRect(barX, barY, barW * (t / 5), barH);
+    hudY += 26;
+  }
+  if (ship && ship.shield > 0) {
+    const t = ship.shield;
+    ctx.fillStyle = '#4da6ff';
+    ctx.textAlign = 'center';
+    ctx.font = '13px monospace';
+    ctx.fillText(`ESCUDO ${t.toFixed(1)}s`, W / 2, hudY);
+    const barW = 80;
+    const barH = 4;
+    const barX = W / 2 - barW / 2;
+    const barY = hudY + 6;
+    ctx.strokeStyle = 'rgba(77,166,255,0.5)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barW, barH);
+    ctx.fillStyle = '#4da6ff';
+    ctx.fillRect(barX, barY, barW * (t / 8), barH);
+    hudY += 26;
   }
 }
 
