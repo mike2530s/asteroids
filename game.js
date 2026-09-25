@@ -162,25 +162,34 @@ class Asteroid {
   }
 }
 
-// ── Skins ─────────────────────────────────────────────────────────────────────
-const SKINS = [
-  { name: 'CLASICA', stroke: '#fff',    flame: 'rgba(255,130,0,0.85)' },
-  { name: 'NEON',    stroke: '#0ff',    flame: 'rgba(0,255,255,0.9)' },
-  { name: 'MAGMA',   stroke: '#ff5a2a', flame: 'rgba(255,60,20,0.9)' },
-  { name: 'VENENO',  stroke: '#7CFC00', flame: 'rgba(124,252,0,0.9)' },
+// ── Naves ─────────────────────────────────────────────────────────────────────
+const SHIPS = [
+  { name: 'CLASICA',  stroke: '#fff',    flame: 'rgba(255,130,0,0.85)',  scale: 1, points: 1 },
+  { name: 'NEON',     stroke: '#0ff',    flame: 'rgba(0,255,255,0.9)',   scale: 1, points: 1 },
+  { name: 'MAGMA',    stroke: '#ff5a2a', flame: 'rgba(255,60,20,0.9)',   scale: 1, points: 1 },
+  { name: 'VENENO',   stroke: '#7CFC00', flame: 'rgba(124,252,0,0.9)',  scale: 1, points: 1 },
+  { name: 'IMPERIAL', stroke: '#b366ff', flame: 'rgba(153,51,255,0.9)',  scale: 2, points: 2 },
 ];
-const SKIN_KEY = 'asteroids-skin';
-const loadSkin = () => {
+const SHIP_KEY = 'asteroids-skin';
+const loadShip = () => {
   try {
-    const i = parseInt(localStorage.getItem(SKIN_KEY), 10);
-    return Number.isInteger(i) && SKINS[i] ? i : 0;
+    const i = parseInt(localStorage.getItem(SHIP_KEY), 10);
+    return Number.isInteger(i) && SHIPS[i] ? i : 0;
   } catch { return 0; }
 };
-const saveSkin = i => { try { localStorage.setItem(SKIN_KEY, i); } catch {} };
+const saveShip = i => { try { localStorage.setItem(SHIP_KEY, i); } catch {} };
 
 // ── Ship ──────────────────────────────────────────────────────────────────────
+const SHIP_BASE_RADIUS = 12;
+
 class Ship {
-  constructor() { this.skin = loadSkin(); this.reset(); }
+  constructor() { this.ship = loadShip(); this.reset(); }
+
+  // Datos de la nave equipada
+  stats() { return SHIPS[this.ship] || SHIPS[0]; }
+
+  // Multiplicador de puntos de la nave equipada
+  scoreMult() { return this.stats().points; }
 
   reset() {
     this.x      = W / 2;
@@ -188,7 +197,7 @@ class Ship {
     this.angle  = -Math.PI / 2;
     this.vx     = 0;
     this.vy     = 0;
-    this.radius = 12;
+    this.radius = SHIP_BASE_RADIUS * this.stats().scale;
     this.thrusting     = false;
     this.invincible    = 3;
     this.shootCooldown = 0;
@@ -228,13 +237,15 @@ class Ship {
   tryShoot() {
     if (this.shootCooldown > 0 || this.dead) return [];
     this.shootCooldown = 0.2;
-    const NOSE = 21;
+    const s = this.stats().scale;
+    const NOSE = 21 * s;
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
     if (this.tripleShot <= 0) return [new Bullet(ox, oy, this.angle)];
     const px = -Math.sin(this.angle);
     const py = Math.cos(this.angle);
-    return [-8, 0, 8].map(off => new Bullet(ox + px * off, oy + py * off, this.angle));
+    const spread = 8 * s;
+    return [-spread, 0, spread].map(off => new Bullet(ox + px * off, oy + py * off, this.angle));
   }
 
   draw() {
@@ -254,7 +265,8 @@ class Ship {
 
     const boostActive = this.speedBoost > 0;
     const tripleActive = this.tripleShot > 0;
-    const skin = SKINS[this.skin] || SKINS[0];
+    const stats = this.stats();
+    const s = stats.scale;
 
     // Halo cyan sutil cuando velocidad activa
     if (boostActive) {
@@ -281,8 +293,9 @@ class Ship {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    ctx.strokeStyle = boostActive ? '#0ff' : tripleActive ? '#f0f' : skin.stroke;
-    ctx.lineWidth   = 1.5;
+    ctx.scale(s, s);
+    ctx.strokeStyle = boostActive ? '#0ff' : tripleActive ? '#f0f' : stats.stroke;
+    ctx.lineWidth   = 1.5 / s;
     ctx.lineJoin    = 'round';
 
     // Silueta clásica: triángulo con muesca trasera
@@ -300,7 +313,7 @@ class Ship {
       ctx.moveTo(-8, -4);
       ctx.lineTo(-8 - rand(6, 14), 0);
       ctx.lineTo(-8,  4);
-      ctx.strokeStyle = boostActive ? 'rgba(0,255,255,0.9)' : skin.flame;
+      ctx.strokeStyle = boostActive ? 'rgba(0,255,255,0.9)' : stats.flame;
       ctx.stroke();
     }
 
@@ -483,6 +496,11 @@ function explode(x, y, count = 8) {
   for (let i = 0; i < count; i++) particles.push(new Particle(x, y));
 }
 
+// Suma puntos aplicando el multiplicador de la nave equipada
+function addScore(base) {
+  score += Math.round(base * ship.scoreMult());
+}
+
 function killShip() {
   explode(ship.x, ship.y, 14);
   ship.dead = true;
@@ -516,11 +534,12 @@ function update(dt) {
     return;
   }
 
-  // Cambiar skin 1-4
-  for (let i = 0; i < SKINS.length; i++) {
+  // Cambiar nave 1-5
+  for (let i = 0; i < SHIPS.length; i++) {
     if (pressed('Digit' + (i + 1)) || pressed('Numpad' + (i + 1))) {
-      ship.skin = i;
-      saveSkin(i);
+      ship.ship = i;
+      ship.radius = SHIP_BASE_RADIUS * ship.stats().scale;
+      saveShip(i);
     }
   }
 
@@ -560,11 +579,11 @@ function update(dt) {
         b.dead = true;
         a.dead = true;
         if (a.isShootingStar) {
-          score += 500;                      // bonificación alta
+          addScore(500);                     // bonificación alta
           explode(a.x, a.y, 12);            // partículas doradas/amarillas
           // NO dividir: split retorna []
         } else {
-          score += POINTS[a.size];
+          addScore(POINTS[a.size]);
           explode(a.x, a.y, a.size * 5);
           newAsteroids.push(...a.split()); // asteroides normales se parten
         }
@@ -582,10 +601,10 @@ function update(dt) {
         if (!a.dead && dist(ship, a) < ship.radius + 10 + a.radius * 0.82) {
           a.dead = true;
           if (a.isShootingStar) {
-            score += 500;
+            addScore(500);
             explode(a.x, a.y, 12);
           } else {
-            score += POINTS[a.size];
+            addScore(POINTS[a.size]);
             explode(a.x, a.y, a.size * 5);
             blocked.push(...a.split());
           }
@@ -619,12 +638,13 @@ function update(dt) {
 }
 
 // ── Draw ──────────────────────────────────────────────────────────────────────
-function drawLifeIcon(x, y, color = '#fff') {
+function drawLifeIcon(x, y, color = '#fff', scale = 1) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(-Math.PI / 2);
+  ctx.scale(scale, scale);
   ctx.strokeStyle = color;
-  ctx.lineWidth   = 1.2;
+  ctx.lineWidth   = 1.2 / scale;
   ctx.lineJoin    = 'round';
   ctx.beginPath();
   ctx.moveTo( 9,  0);
@@ -637,23 +657,35 @@ function drawLifeIcon(x, y, color = '#fff') {
 }
 
 function drawHUD() {
+  const stats = ship ? ship.stats() : SHIPS[0];
+
   ctx.fillStyle = '#fff';
   ctx.font = '15px monospace';
 
   ctx.textAlign = 'left';
-  ctx.fillText(`SCORE  ${score}`, 14, 26);
+  const scoreLabel = `SCORE  ${score}`;
+  ctx.fillText(scoreLabel, 14, 26);
 
+  // Indicador del multiplicador de puntos de la nave
+  if (stats.points > 1) {
+    const x = 14 + ctx.measureText(scoreLabel).width + 10;
+    ctx.fillStyle = stats.stroke;
+    ctx.font = '13px monospace';
+    ctx.fillText(`x${stats.points}`, x, 26);
+  }
+
+  ctx.fillStyle = '#fff';
+  ctx.font = '15px monospace';
   ctx.textAlign = 'center';
   ctx.fillText(`NIVEL ${level}`, W / 2, 26);
 
   for (let i = 0; i < lives; i++)
-    drawLifeIcon(W - 16 - i * 22, 18, (ship ? SKINS[ship.skin] || SKINS[0] : SKINS[0]).stroke);
+    drawLifeIcon(W - 16 - i * 22 * stats.scale, 18, stats.stroke, stats.scale);
 
-  const skin = ship ? SKINS[ship.skin] || SKINS[0] : SKINS[0];
   ctx.textAlign = 'left';
-  ctx.fillStyle = skin.stroke;
+  ctx.fillStyle = stats.stroke;
   ctx.font = '12px monospace';
-  ctx.fillText(`SKIN [1-4] ${skin.name}`, 14, H - 14);
+  ctx.fillText(`NAVE [1-${SHIPS.length}] ${stats.name}`, 14, H - 14);
 
   let hudY = 46;
   if (ship && ship.speedBoost > 0) {

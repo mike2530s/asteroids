@@ -29,6 +29,21 @@ Luego visita `http://localhost:3000`.
 | `←` `→`   | Rotar nave |
 | `↑`       | Propulsar  |
 | `Espacio` | Disparar   |
+| `1`–`5`   | Cambiar nave |
+
+## Naves
+
+Elige tu nave con las teclas `1`–`5` (la selección se guarda en el navegador).
+
+| #   | Nave      | Color  | Tamaño | Puntos |
+| --- | --------- | ------ | ------ | ------ |
+| 1   | `CLASICA` | Blanco | 1x     | x1     |
+| 2   | `NEON`    | Cyan   | 1x     | x1     |
+| 3   | `MAGMA`   | Naranja| 1x     | x1     |
+| 4   | `VENENO`  | Verde  | 1x     | x1     |
+| 5   | `IMPERIAL`| Morado | 2x     | x2     |
+
+La `IMPERIAL` es el doble de grande que la nave original y otorga el doble de puntos, a cambio de una zona de colisión más amplia.
 
 ## Puntuación
 
@@ -37,6 +52,8 @@ Luego visita `http://localhost:3000`.
 | Grande    | 20     |
 | Mediano   | 50     |
 | Pequeño   | 100    |
+
+Se multiplican según la nave equipada (la `IMPERIAL` los duplica).
 
 ## Características
 
