@@ -2,8 +2,9 @@
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-const W = 800;
-const H = 600;
+const SCALE = 2;
+const W = 800 * SCALE;
+const H = 600 * SCALE;
 
 // ── Input ─────────────────────────────────────────────────────────────────────
 const keys = {};
@@ -34,11 +35,11 @@ class Bullet {
   constructor(x, y, angle) {
     this.x = x;
     this.y = y;
-    const SPEED = 520;
+    const SPEED = 520 * SCALE;
     this.vx = Math.cos(angle) * SPEED;
     this.vy = Math.sin(angle) * SPEED;
     this.ttl  = 1.1;
-    this.radius = 2;
+    this.radius = 2 * SCALE;
     this.dead = false;
   }
 
@@ -58,8 +59,8 @@ class Bullet {
 }
 
 // ── Asteroid ──────────────────────────────────────────────────────────────────
-const RADII  = [0, 16, 30, 50];   // por tamaño 1, 2, 3
-const SPEEDS = [0, 85, 55, 32];   // velocidad base por tamaño
+const RADII  = [0, 16 * SCALE, 30 * SCALE, 50 * SCALE];   // por tamaño 1, 2, 3
+const SPEEDS = [0, 85 * SCALE, 55 * SCALE, 32 * SCALE];   // velocidad base por tamaño
 const POINTS = [0, 100, 50, 20];  // puntos por tamaño
 
 class Asteroid {
@@ -143,7 +144,7 @@ class Asteroid {
     
     // Estela corta: 2-3 puntos atrás siguiendo la dirección
     if (this.isShootingStar) {
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1 * SCALE;
       ctx.strokeStyle = 'rgba(255,215,0,0.5)';
       // Dibujar 2 segmentos atrás en la dirección de movimiento
       const trailPoints = 2;
@@ -152,8 +153,8 @@ class Asteroid {
         const tx = this.x - this.vx * t * 0.1; // scaled for visual
         const ty = this.y - this.vy * t * 0.1;
         ctx.beginPath();
-        ctx.moveTo(tx - 3, ty);
-        ctx.lineTo(tx + 3, ty);
+        ctx.moveTo(tx - 3 * SCALE, ty);
+        ctx.lineTo(tx + 3 * SCALE, ty);
         ctx.stroke();
       }
     }
@@ -180,7 +181,7 @@ const loadShip = () => {
 const saveShip = i => { try { localStorage.setItem(SHIP_KEY, i); } catch {} };
 
 // ── Ship ──────────────────────────────────────────────────────────────────────
-const SHIP_BASE_RADIUS = 12;
+const SHIP_BASE_RADIUS = 12 * SCALE;
 
 class Ship {
   constructor() { this.ship = loadShip(); this.reset(); }
@@ -216,7 +217,7 @@ class Ship {
     if (this.tripleShot    > 0) this.tripleShot    -= dt;
 
     const ROT   = 3.5;   // rad/s
-    const THRUST = this.speedBoost > 0 ? 520 : 260;  // px/s² (2x con velocidad)
+    const THRUST = (this.speedBoost > 0 ? 520 : 260) * SCALE;  // px/s² (2x con velocidad)
     const DRAG   = 0.987;
 
     if (keys['ArrowLeft'])  this.angle -= ROT * dt;
@@ -238,13 +239,13 @@ class Ship {
     if (this.shootCooldown > 0 || this.dead) return [];
     this.shootCooldown = 0.2;
     const s = this.stats().scale;
-    const NOSE = 21 * s;
+    const NOSE = 21 * s * SCALE;
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
     if (this.tripleShot <= 0) return [new Bullet(ox, oy, this.angle)];
     const px = -Math.sin(this.angle);
     const py = Math.cos(this.angle);
-    const spread = 8 * s;
+    const spread = 8 * s * SCALE;
     return [-spread, 0, spread].map(off => new Bullet(ox + px * off, oy + py * off, this.angle));
   }
 
@@ -254,9 +255,9 @@ class Ship {
       ctx.save();
       ctx.translate(this.x, this.y);
       ctx.strokeStyle = `rgba(77,166,255,${0.6 + Math.sin(Date.now() * 0.01) * 0.25})`;
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2 * SCALE;
       ctx.beginPath();
-      ctx.arc(0, 0, this.radius + 10, 0, Math.PI * 2);
+      ctx.arc(0, 0, this.radius + 10 * SCALE, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -273,9 +274,9 @@ class Ship {
       ctx.save();
       ctx.translate(this.x, this.y);
       ctx.strokeStyle = `rgba(0,255,255,${0.35 + Math.sin(Date.now()*0.012)*0.15})`;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.5 * SCALE;
       ctx.beginPath();
-      ctx.arc(0, 0, this.radius + 6, 0, Math.PI * 2);
+      ctx.arc(0, 0, this.radius + 6 * SCALE, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -283,9 +284,9 @@ class Ship {
       ctx.save();
       ctx.translate(this.x, this.y);
       ctx.strokeStyle = `rgba(255,0,255,${0.35 + Math.sin(Date.now()*0.012)*0.15})`;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.5 * SCALE;
       ctx.beginPath();
-      ctx.arc(0, 0, this.radius + 14, 0, Math.PI * 2);
+      ctx.arc(0, 0, this.radius + 14 * SCALE, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -293,7 +294,7 @@ class Ship {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    ctx.scale(s, s);
+    ctx.scale(s * SCALE, s * SCALE);
     ctx.strokeStyle = boostActive ? '#0ff' : tripleActive ? '#f0f' : stats.stroke;
     ctx.lineWidth   = 1.5 / s;
     ctx.lineJoin    = 'round';
@@ -327,7 +328,7 @@ class Particle {
     this.x  = x;
     this.y  = y;
     const angle = rand(0, Math.PI * 2);
-    const speed = rand(30, 130);
+    const speed = rand(30 * SCALE, 130 * SCALE);
     this.vx   = Math.cos(angle) * speed;
     this.vy   = Math.sin(angle) * speed;
     this.life = rand(0.4, 1.1);
@@ -345,7 +346,7 @@ class Particle {
   draw() {
     const alpha = this.ttl / this.life;
     ctx.strokeStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 * SCALE;
     ctx.beginPath();
     ctx.moveTo(this.x, this.y);
     ctx.lineTo(this.x - this.vx * 0.05, this.y - this.vy * 0.05);
@@ -359,7 +360,7 @@ class PowerUp {
     this.x = x;
     this.y = y;
     this.kind = kind;
-    this.radius = 14;
+    this.radius = 14 * SCALE;
     this.ttl = 8;
     this.dead = false;
     this.pulse = rand(0, Math.PI * 2);
@@ -377,7 +378,7 @@ class PowerUp {
     if (this.kind === 'shield') {
       ctx.save();
       ctx.translate(this.x, this.y);
-      ctx.scale(scale, scale);
+      ctx.scale(scale * SCALE, scale * SCALE);
       ctx.strokeStyle = `rgba(77,166,255,${alpha.toFixed(2)})`;
       ctx.lineWidth = 1.8;
       ctx.beginPath();
@@ -397,7 +398,7 @@ class PowerUp {
     const col = this.kind === 'triple' ? '255,0,255' : '0,255,255';
     ctx.save();
     ctx.translate(this.x, this.y);
-    ctx.scale(scale, scale);
+    ctx.scale(scale * SCALE, scale * SCALE);
     ctx.strokeStyle = `rgba(${col},${alpha.toFixed(2)})`;
     ctx.lineWidth = 1.8;
     ctx.lineJoin = 'round';
@@ -445,7 +446,7 @@ let powerUpSpawnCooldown;
 let shieldSpawnCooldown;
 
 function spawnAsteroids(count) {
-  const SAFE_DIST = 130;
+  const SAFE_DIST = 130 * SCALE;
   for (let i = 0; i < count; i++) {
     let x, y;
     do {
@@ -457,7 +458,7 @@ function spawnAsteroids(count) {
 }
 
 function spawnPowerUp(kind = 'speed') {
-  const SAFE_DIST = 130;
+  const SAFE_DIST = 130 * SCALE;
   let x, y;
   do {
     x = rand(0, W);
@@ -642,7 +643,7 @@ function drawLifeIcon(x, y, color = '#fff', scale = 1) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(-Math.PI / 2);
-  ctx.scale(scale, scale);
+  ctx.scale(scale * SCALE, scale * SCALE);
   ctx.strokeStyle = color;
   ctx.lineWidth   = 1.2 / scale;
   ctx.lineJoin    = 'round';
@@ -660,96 +661,96 @@ function drawHUD() {
   const stats = ship ? ship.stats() : SHIPS[0];
 
   ctx.fillStyle = '#fff';
-  ctx.font = '15px monospace';
+  ctx.font = `${15 * SCALE}px monospace`;
 
   ctx.textAlign = 'left';
   const scoreLabel = `SCORE  ${score}`;
-  ctx.fillText(scoreLabel, 14, 26);
+  ctx.fillText(scoreLabel, 14 * SCALE, 26 * SCALE);
 
   // Indicador del multiplicador de puntos de la nave
   if (stats.points > 1) {
-    const x = 14 + ctx.measureText(scoreLabel).width + 10;
+    const x = 14 * SCALE + ctx.measureText(scoreLabel).width + 10 * SCALE;
     ctx.fillStyle = stats.stroke;
-    ctx.font = '13px monospace';
-    ctx.fillText(`x${stats.points}`, x, 26);
+    ctx.font = `${13 * SCALE}px monospace`;
+    ctx.fillText(`x${stats.points}`, x, 26 * SCALE);
   }
 
   ctx.fillStyle = '#fff';
-  ctx.font = '15px monospace';
+  ctx.font = `${15 * SCALE}px monospace`;
   ctx.textAlign = 'center';
-  ctx.fillText(`NIVEL ${level}`, W / 2, 26);
+  ctx.fillText(`NIVEL ${level}`, W / 2, 26 * SCALE);
 
   for (let i = 0; i < lives; i++)
-    drawLifeIcon(W - 16 - i * 22 * stats.scale, 18, stats.stroke, stats.scale);
+    drawLifeIcon(W - 16 * SCALE - i * 22 * SCALE * stats.scale, 18 * SCALE, stats.stroke, stats.scale);
 
   ctx.textAlign = 'left';
   ctx.fillStyle = stats.stroke;
-  ctx.font = '12px monospace';
-  ctx.fillText(`NAVE [1-${SHIPS.length}] ${stats.name}`, 14, H - 14);
+  ctx.font = `${12 * SCALE}px monospace`;
+  ctx.fillText(`NAVE [1-${SHIPS.length}] ${stats.name}`, 14 * SCALE, H - 14 * SCALE);
 
-  let hudY = 46;
+  let hudY = 46 * SCALE;
   if (ship && ship.speedBoost > 0) {
     const t = ship.speedBoost;
     ctx.fillStyle = '#0ff';
     ctx.textAlign = 'center';
-    ctx.font = '13px monospace';
+    ctx.font = `${13 * SCALE}px monospace`;
     ctx.fillText(`VELOCIDAD ${t.toFixed(1)}s`, W / 2, hudY);
     // Barra de duración
-    const barW = 80;
-    const barH = 4;
+    const barW = 80 * SCALE;
+    const barH = 4 * SCALE;
     const barX = W / 2 - barW / 2;
-    const barY = hudY + 6;
+    const barY = hudY + 6 * SCALE;
     ctx.strokeStyle = 'rgba(0,255,255,0.5)';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 * SCALE;
     ctx.strokeRect(barX, barY, barW, barH);
     ctx.fillStyle = '#0ff';
     ctx.fillRect(barX, barY, barW * (t / 5), barH);
-    hudY += 26;
+    hudY += 26 * SCALE;
   }
   if (ship && ship.tripleShot > 0) {
     const t = ship.tripleShot;
     ctx.fillStyle = '#f0f';
     ctx.textAlign = 'center';
-    ctx.font = '13px monospace';
+    ctx.font = `${13 * SCALE}px monospace`;
     ctx.fillText(`TRIPLE ${t.toFixed(1)}s`, W / 2, hudY);
-    const barW = 80;
-    const barH = 4;
+    const barW = 80 * SCALE;
+    const barH = 4 * SCALE;
     const barX = W / 2 - barW / 2;
-    const barY = hudY + 6;
+    const barY = hudY + 6 * SCALE;
     ctx.strokeStyle = 'rgba(255,0,255,0.5)';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 * SCALE;
     ctx.strokeRect(barX, barY, barW, barH);
     ctx.fillStyle = '#f0f';
     ctx.fillRect(barX, barY, barW * (t / 5), barH);
-    hudY += 26;
+    hudY += 26 * SCALE;
   }
   if (ship && ship.shield > 0) {
     const t = ship.shield;
     ctx.fillStyle = '#4da6ff';
     ctx.textAlign = 'center';
-    ctx.font = '13px monospace';
+    ctx.font = `${13 * SCALE}px monospace`;
     ctx.fillText(`ESCUDO ${t.toFixed(1)}s`, W / 2, hudY);
-    const barW = 80;
-    const barH = 4;
+    const barW = 80 * SCALE;
+    const barH = 4 * SCALE;
     const barX = W / 2 - barW / 2;
-    const barY = hudY + 6;
+    const barY = hudY + 6 * SCALE;
     ctx.strokeStyle = 'rgba(77,166,255,0.5)';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 * SCALE;
     ctx.strokeRect(barX, barY, barW, barH);
     ctx.fillStyle = '#4da6ff';
     ctx.fillRect(barX, barY, barW * (t / 8), barH);
-    hudY += 26;
+    hudY += 26 * SCALE;
   }
 }
 
 function drawOverlay(title, sub) {
   ctx.textAlign   = 'center';
   ctx.fillStyle   = '#fff';
-  ctx.font        = 'bold 46px monospace';
-  ctx.fillText(title, W / 2, H / 2 - 18);
-  ctx.font        = '18px monospace';
+  ctx.font        = `bold ${46 * SCALE}px monospace`;
+  ctx.fillText(title, W / 2, H / 2 - 18 * SCALE);
+  ctx.font        = `${18 * SCALE}px monospace`;
   ctx.fillStyle   = 'rgba(255,255,255,0.65)';
-  ctx.fillText(sub, W / 2, H / 2 + 22);
+  ctx.fillText(sub, W / 2, H / 2 + 22 * SCALE);
 }
 
 function draw() {
