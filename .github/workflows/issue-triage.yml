@@ -39,9 +39,12 @@ jobs:
             const original = issue.body || '_Sin descripción._';
             const body = `${original}\n\n---\n${marker}\n### Checklist repo\n- [ ] Pasos reproducir\n- [ ] Navegador / versión\n- [ ] Nave afectada [1-5] / NIVEL / SCORE\n- [ ] Archivos: \`game.js\`, \`index.html\`\n- [ ] Commit: \`${context.sha}\`\n\n> Texto original arriba intacto, sin reescritura.\n\n#### Metadata\n- Autor: @${issue.user.login}\n- Fecha: ${issue.created_at}\n- Repo: ${context.repo.owner}/${context.repo.repo}#${issue.number}\n`;
 
+            const newTitle = issue.title.startsWith('[Triage]') ? issue.title : `[Triage] ${issue.title}`;
+
             await github.rest.issues.update({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
+              title: newTitle,
               body,
             });
